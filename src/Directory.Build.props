@@ -1,0 +1,21 @@
+﻿<Project>
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsyncFixer" Version="1.5.1" PrivateAssets="All" IncludeAssets="Runtime;Build;Native;ContentFiles;Analyzers;BuildTransitive" />
+    <PackageReference Include="JetBrains.Annotations" Version="2020.3.0" PrivateAssets="All" IncludeAssets="Runtime;Build;Native;ContentFiles;Analyzers;BuildTransitive" />
+    <PackageReference Include="Roslynator.Analyzers" Version="3.1.0" PrivateAssets="All" IncludeAssets="Runtime;Build;Native;ContentFiles;Analyzers;BuildTransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\**\*.cs" Link="%(RecursiveDir)%(Filename)%(Extension)"/>
+  </ItemGroup>
+</Project>

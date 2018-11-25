@@ -1,0 +1,91 @@
+variables:
+  DOTNETCORE_SDK_IMAGE: mcr.microsoft.com/dotnet/sdk:3.1-alpine
+  ASPNETCORE_RUNTIME_IMAGE: mcr.microsoft.com/dotnet/aspnet:3.1-alpine
+
+stages:
+  - build
+  - test
+  - package
+
+.common:
+  only:
+    refs:
+      - master
+      - /^feature\/.+$/
+  tags:
+    - docker
+
+.build-and-test:
+  extends: .common
+  image: $DOTNETCORE_SDK_IMAGE
+  variables:
+    DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+    # GIT_SUBMODULE_STRATEGY: normal
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - src/**/obj/project.assets.json
+      - src/**/obj/*.cache
+      - src/**/obj/*.props
+      - src/**/obj/*.targets
+  interruptible: true
+
+build:
+  stage: build
+  extends: .build-and-test
+  script:
+    - ./build.sh /p:PublishProfile=FileSystem
+  artifacts:
+    paths:
+      - artifacts/build/
+
+# test:
+#   stage: test
+#   extends: .build-and-test
+#   cache:
+#     policy: pull
+#   script:
+#     - ./build.sh /t:Test /p:XUnitGenerateJUnitResults=true
+#   coverage: '/(?m:.*)^(?-m:\s*\|\s*Total\s*\|\s*(\d{1,3}(?:[.,]\d{1,2})?%)\s*\|.*?\|.*?\|\s*)$/'
+#   artifacts:
+#     reports:
+#       junit: artifacts/test/*.TestResultsJUnit.xml
+#   needs:
+#     - job: build
+#       artifacts: false
+
+package:
+  stage: package
+  extends: .common
+  image: docker
+  services:
+    - docker:dind
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - |
+      echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - |
+      function build_dotnet_docker_image() {
+        image="$1"
+        assembly="$2"
+        folder="${3:-$assembly}"
+        commitImage="$CI_REGISTRY/$CI_PROJECT_PATH/$image:$CI_COMMIT_SHA"
+        cd artifacts/build/$folder
+        echo 'FROM '$ASPNETCORE_RUNTIME_IMAGE'
+          WORKDIR /app
+          COPY . ./
+          EXPOSE 80
+          ENTRYPOINT ["dotnet", "'$assembly'.dll"]' | \
+        docker build -t "$commitImage" -f- .
+        docker push "$commitImage"
+        cd -
+      }
+  script:
+    - "#(nop) build_dotnet_docker_image image_name Assembly.Name"
+  needs:
+    - job: build
+      artifacts: true
+    # - job: test
+    #   artifacts: false

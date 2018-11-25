@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" TreatAsLocalProperty="ArtifactsDir;BuildDir" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <DeployOnBuild Condition="'$(DeployOnBuild)' == ''">true</DeployOnBuild>
+    <PublishProfile Condition="'$(PublishProfile)' == '' And ('$(OS)' != 'Windows_NT' Or '$(MSBuildRuntimeType)' == 'Core')">FileSystem</PublishProfile>
+    <PublishProfile Condition="'$(PublishProfile)' == ''">Package</PublishProfile>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">15.0</VisualStudioVersion>
+    <ArtifactsDir>$(MSBuildProjectDirectory)\artifacts\</ArtifactsDir>
+    <BuildDir>$(ArtifactsDir)build\</BuildDir>
+    <EnableCoverage Condition="'$(EnableCoverage)' == ''">true</EnableCoverage>
+    <!-- The folder where the .zip and .cmd file will be located for WebDeploy packages -->
+    <WebDeployPackageDest Condition="'$(WebDeployPackageDest)' == ''">$(BuildDir)</WebDeployPackageDest>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AspNetCoreEnvironment Condition="'$(AspNetCoreEnvironment)' == ''">Production</AspNetCoreEnvironment>
+    <DotNetCLITool Condition="'$(DotNetCLITool)' == ''">dotnet</DotNetCLITool>
+    <_WebDeployPackageDestWithSlash>$(WebDeployPackageDest)</_WebDeployPackageDestWithSlash>
+    <_WebDeployPackageDestWithSlash Condition="'$(_WebDeployPackageDestWithSlash)' != '' And !HasTrailingSlash('$(_WebDeployPackageDestWithSlash)')">$(_WebDeployPackageDestWithSlash)\</_WebDeployPackageDestWithSlash>
+    <BuildProperties>Configuration=$(Configuration);VisualStudioVersion=$(VisualStudioVersion)</BuildProperties>
+    <PublishProjectProperties>DeployOnBuild=$(DeployOnBuild);PublishProfile=$(PublishProfile);DesktopBuildPackageLocation=$(_WebDeployPackageDestWithSlash);DeleteExistingFiles=true</PublishProjectProperties>
+    <PublishProjectProperties Condition="Exists('$(MSBuildThisFileDirectory)build\PublishProfiles\$(PublishProfile).pubxml')">$(PublishProjectProperties);_PublishProfilesDir=$(MSBuildThisFileDirectory)build\PublishProfiles\</PublishProjectProperties>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildProjectDirectory)\src\**\*.csproj">
+      <AdditionalProperties>$(PublishProjectProperties)</AdditionalProperties>
+    </ProjectReference>
+    <ProjectReference Include="$(MSBuildProjectDirectory)\test\**\*.Tests.csproj">
+      <TestFramework>xUnit</TestFramework>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="BeforeBuild">
+    <MakeDir Directories="$(ArtifactsDir);$(BuildDir)" />
+    <!-- A hack for the 'dotnet publish' command to add the folder to the PATH -->
+    <!--<MakeDir Directories="@(ProjectReference->'%(RootDir)%(Directory)%(RecursiveDir)node_modules\.bin')" Condition="Exists('%(RootDir)%(Directory)%(RecursiveDir)package.json')" />-->
+  </Target>
+
+  <Target Name="Build" DependsOnTargets="BeforeBuild">
+    <MSBuild Projects="@(ProjectReference)"
+      Properties="$(BuildProperties)"
+      Targets="Build" />
+  </Target>
+
+  <Target Name="BeforeClean" />
+
+  <Target Name="Clean" DependsOnTargets="BeforeClean">
+    <MSBuild Projects="@(ProjectReference)"
+      Properties="$(BuildProperties)"
+      Targets="Clean" />
+
+    <RemoveDir Directories="$(BuildDir)" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="DistClean" DependsOnTargets="Clean">
+    <ItemGroup>
+      <_NodeModules Include="$(MSBuildProjectDirectory)\**\node_modules" />
+    </ItemGroup>
+
+    <RemoveDir Directories="@(_NodeModules)" ContinueOnError="true" />
+    <RemoveDir Directories="$(ArtifactsDir)" ContinueOnError="true" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\packages" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="Rebuild" DependsOnTargets="Clean;Build" />
+
+  <Target Name="Restore">
+    <MSBuild Projects="@(ProjectReference)"
+      Properties="$(BuildProperties)"
+      Targets="Restore" />
+  </Target>
+
+  <PropertyGroup>
+    <TestWorkingDirectory Condition="'$(TestWorkingDirectory)' == ''">$(ArtifactsDir)test\</TestWorkingDirectory>
+    <TestWorkingDirectory>$([MSBuild]::EnsureTrailingSlash('$(TestWorkingDirectory)'))</TestWorkingDirectory>
+  </PropertyGroup>
+
+  <Target Name="Test" DependsOnTargets="BeforeTest;XunitTest">
+    <Error Text="One or more tests failed" Condition="'%(_TestRunnerExitCodes.Identity)' > 0" />
+  </Target>
+
+  <Target Name="BeforeTest">
+    <Error Text=".NET Core version of MSBuild does not support 'XslTransformation' task yet" Condition="'$(XUnitGenerateNUnitResults)' == 'true' And '$(MSBuildRuntimeType)' == 'Core'" />
+
+    <MakeDir Directories="$(TestWorkingDirectory)" Condition="!Exists('$(TestWorkingDirectory)')" />
+    <Delete Files="$(TestWorkingDirectory)coverage.json" Condition="Exists('$(TestWorkingDirectory)coverage.json')" />
+  </Target>
+
+  <ItemGroup>
+    <XUnitProjectReference Include="@(ProjectReference->WithMetadataValue('TestFramework', 'xUnit'))" />
+  </ItemGroup>
+
+  <Target Name="XunitTest" Outputs="$(TestWorkingDirectory)%(XUnitProjectReference.Filename).TestResults.xml">
+    <PropertyGroup>
+      <_XUnitTestResultsFile>$(TestWorkingDirectory)%(XUnitProjectReference.Filename).TestResults.xml</_XUnitTestResultsFile>
+      <_XUnitTestResultsNUnitFile>$(TestWorkingDirectory)%(XUnitProjectReference.Filename).TestResultsNUnit.xml</_XUnitTestResultsNUnitFile>
+      <_XUnitTestResultsJUnitFile>$(TestWorkingDirectory)%(XUnitProjectReference.Filename).TestResultsJUnit.xml</_XUnitTestResultsJUnitFile>
+      <_CmdTest>"$(DotNetCLITool)" test -c $(Configuration) -l "xunit;LogFilePath=$(_XUnitTestResultsFile)"</_CmdTest>
+      <_CmdTest Condition="'$(XUnitGenerateJUnitResults)' == 'true'">$(_CmdTest) -l "junit;LogFilePath=$(_XUnitTestResultsJUnitFile)"</_CmdTest>
+      <_CmdTest Condition="'$(EnableCoverage)' == 'true'">$(_CmdTest) /p:CollectCoverage=true /p:CoverletOutput="$(TestWorkingDirectory)coverage.json" /p:MergeWith="$(TestWorkingDirectory)coverage.json"</_CmdTest>
+    </PropertyGroup>
+
+    <Delete Files="$(_XUnitTestResultsFile)" Condition="Exists('$(_XUnitTestResultsFile)')" />
+    <Delete Files="$(_XUnitTestResultsJUnitFile)" Condition="'$(XUnitGenerateJUnitResults)' == 'true' And Exists('$(_XUnitTestResultsJUnitFile)')" />
+
+    <Exec Command="$(_CmdTest)"
+      IgnoreExitCode="true"
+      StdErrEncoding="utf-8"
+      StdOutEncoding="utf-8"
+      WorkingDirectory="%(XUnitProjectReference.RootDir)%(XUnitProjectReference.Directory)">
+      <Output TaskParameter="ExitCode" ItemName="_TestRunnerExitCodes" />
+    </Exec>
+
+    <XslTransformation Condition="'$(XUnitGenerateNUnitResults)' == 'true'"
+      XmlInputPaths="$(_XUnitTestResultsFile)"
+      XslInputPath="$(MSBuildProjectDirectory)\build\NUnitXml.xslt"
+      OutputPaths="$(_XUnitTestResultsNUnitFile)" />
+  </Target>
+</Project>

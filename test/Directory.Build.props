@@ -1,0 +1,28 @@
+﻿<Project>
+  <Import Project="..\Directory.Build.props" />
+
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DeveloperBuildTestTfms>netcoreapp3.1</DeveloperBuildTestTfms>
+    <StandardTestTfms>$(DeveloperBuildTestTfms)</StandardTestTfms>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Label="coverlet">
+    <Exclude>[*.Views]*</Exclude>
+    <ExcludeByAttribute>ObsoleteAttribute,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+    <!--<ExcludeByFile>..\..\shared\**\*.cs</ExcludeByFile>-->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.msbuild" Version="2.9.0" PrivateAssets="All" IncludeAssets="Runtime;Build;Native;ContentFiles;Analyzers;BuildTransitive" />
+    <PackageReference Include="JUnitTestLogger" Version="1.1.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.7.0" />
+    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" PrivateAssets="All" IncludeAssets="Runtime;Build;Native;ContentFiles;Analyzers" />
+    <PackageReference Include="XunitXml.TestLogger" Version="2.1.40" />
+  </ItemGroup>
+</Project>

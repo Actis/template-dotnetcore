@@ -1,0 +1,20 @@
+﻿<Project>
+
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);app_data\**;**\.git*;**\*~</DefaultItemExcludes>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)CodeAnalysis.ruleset</CodeAnalysisRuleSet>
+    <ExcludeConfigFilesFromBuildOutput>true</ExcludeConfigFilesFromBuildOutput>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Wunderman Thompson Russia</Authors>
+    <Company>Wunderman Thompson Russia</Company>
+    <Copyright>Copyright © 2020 Wunderman Thompson Russia</Copyright>
+    <Product></Product>
+  </PropertyGroup>
+
+</Project>
